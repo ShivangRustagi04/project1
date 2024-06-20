@@ -1,0 +1,1 @@
+This is a simple Streamlit application that allows users to find top books in any genre using a GPT-2 language model. Users can specify a genre and the number of top books to find, and the agent will generate book recommendations based on their inputs.
