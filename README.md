@@ -15,13 +15,11 @@ This project implements a simple autonomous agent to help users find top books i
 
 ## Tools Used
 
-- **FastAPI**: For creating a REST API.
 - **Hugging Face Transformers**: For generating book recommendations.
 - **Python**: Main programming language.
 
 ## Reasoning
 
-- **FastAPI**: Chosen for its simplicity and speed in creating REST APIs.
 - **Hugging Face Transformers**: Chosen for their powerful natural language processing capabilities to generate book recommendations based on user input.
 
 ## Future Enhancements
