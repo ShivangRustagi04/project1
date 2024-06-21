@@ -67,32 +67,40 @@ def main():
     agent.add_task(task1)
 
     # Execute the first task to get the top 100 books
-    top_100_books, top_100_result = task1.execute()
-    st.success(top_100_result)
+    if "top_100_books" not in st.session_state:
+        st.session_state.top_100_books, top_100_result = task1.execute()
+        st.session_state.top_100_books_result = top_100_result
+    st.success(st.session_state.top_100_books_result)
 
     # Add the second task with the output of the first task
-    task2 = Task("Find top 10 books from top 100", find_top_10_from_100, top_100_books)
+    task2 = Task("Find top 10 books from top 100", find_top_10_from_100, st.session_state.top_100_books)
     agent.add_task(task2)
 
     # Execute the second task to get the top 10 books
-    top_10_books, top_10_result = task2.execute()
-    st.success(top_10_result)
+    if "top_10_books" not in st.session_state:
+        st.session_state.top_10_books, top_10_result = task2.execute()
+        st.session_state.top_10_books_result = top_10_result
+    st.success(st.session_state.top_10_books_result)
 
     # Add the third task with the output of the second task
-    task3 = Task("Find 1 book from top 10 for user", find_1_from_top_10, top_10_books)
+    task3 = Task("Find 1 book from top 10 for user", find_1_from_top_10, st.session_state.top_10_books)
     agent.add_task(task3)
 
     # Execute the third task to get the selected book
-    selected_book, selected_book_result = task3.execute()
-    st.success(selected_book_result)
+    if "selected_book" not in st.session_state:
+        st.session_state.selected_book, selected_book_result = task3.execute()
+        st.session_state.selected_book_result = selected_book_result
+    st.success(st.session_state.selected_book_result)
 
     # Add a final task to conclude the workflow with a thank-you message
     task4 = Task("Close the task and conclude workflow with a thank-you message", lambda: "Thank you for using the book finder agent!")
     agent.add_task(task4)
 
     # Execute the final task
-    final_result = task4.execute()
-    st.success(final_result)
+    if "final_message" not in st.session_state:
+        final_result = task4.execute()
+        st.session_state.final_message = final_result
+    st.success(st.session_state.final_message)
 
 if __name__ == "__main__":
     main()
