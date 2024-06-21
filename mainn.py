@@ -1,9 +1,8 @@
 import streamlit as st
+# Use a pipeline as a high-level helper
 from transformers import pipeline
 
-# Initialize the LLM pipeline
-model_name = "gpt2"  # You can change this to another model if desired
-llm_pipeline = pipeline("text-generation", model=model_name)
+llm_pipeline = pipeline("text-generation", model="EleutherAI/gpt-neo-2.7B")
 
 class WorkflowAgent:
     def __init__(self):
