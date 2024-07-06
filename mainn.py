@@ -1,8 +1,25 @@
-import streamlit as st
-# Use a pipeline as a high-level helper
-from transformers import pipeline
 
-llm_pipeline = pipeline("text-generation", model="EleutherAI/gpt-neo-2.7B")
+import streamlit as st
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import LoraConfig, get_peft_model
+import torch
+import requests
+from bs4 import BeautifulSoup
+
+# Initialize the tokenizer and model
+model_name = "EleutherAI/gpt-neo-2.7B"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+
+# Apply LoRA
+lora_config = LoraConfig(
+    r=8,
+    lora_alpha=32,
+    target_modules=["q_proj", "v_proj"],
+    lora_dropout=0.1,
+    bias="none"
+)
+model = get_peft_model(model, lora_config)
 
 class WorkflowAgent:
     def __init__(self):
@@ -29,13 +46,32 @@ class Task:
             return self.function(*self.args, **self.kwargs)
         return None
 
-# Function to find top 100 books
-def find_top_books(genre, num_books):
+# Function to generate text using the LoRA model
+def generate_text(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(**inputs, max_length=1000, num_return_sequences=1, pad_token_id=tokenizer.eos_token_id)
+    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return generated_text
+
+# Function to find top 100 books using the LLM
+def find_top_books_llm(genre, num_books):
     prompt = f"List the top {num_books} books in the {genre} genre."
-    response = llm_pipeline(prompt, max_length=1000, num_return_sequences=1)
-    books = response[0]['generated_text'].strip().split('\n')
+    response = generate_text(prompt)
+    books = response.strip().split('\n')
     top_books = [book.strip() for book in books if book.strip() and not book.strip().isdigit()][:num_books]
-    result = f"Top {num_books} books in the {genre} genre:"
+    result = f"Top {num_books} books in the {genre} genre (LLM):"
+    for i, book in enumerate(top_books):
+        result += f"\n{i+1}. {book}"
+    return top_books, result
+
+# Function to find top 100 books using web scraping
+def find_top_books_web(genre, num_books):
+    url = f"https://www.goodreads.com/shelf/show/{genre}"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, "html.parser")
+    books = soup.select("a.bookTitle span")
+    top_books = [book.get_text() for book in books][:num_books]
+    result = f"Top {num_books} books in the {genre} genre (Web Scraping):"
     for i, book in enumerate(top_books):
         result += f"\n{i+1}. {book}"
     return top_books, result
@@ -61,18 +97,35 @@ def main():
     # Initialize the workflow agent
     agent = WorkflowAgent()
 
+    genre = st.text_input("Enter book genre:", "fiction")
+
     # Define tasks
-    task1 = Task("Find top 100 books in the fiction genre", find_top_books, "fiction", 100)
-    agent.add_task(task1)
+    task1_llm = Task("Find top 100 books in the genre using LLM", find_top_books_llm, genre, 100)
+    task1_web = Task("Find top 100 books in the genre using Web Scraping", find_top_books_web, genre, 100)
+    agent.add_task(task1_llm)
+    agent.add_task(task1_web)
 
     # Execute the first task to get the top 100 books
-    if "top_100_books" not in st.session_state:
-        st.session_state.top_100_books, top_100_result = task1.execute()
-        st.session_state.top_100_books_result = top_100_result
-    st.success(st.session_state.top_100_books_result)
+    if "top_100_books_llm" not in st.session_state:
+        st.session_state.top_100_books_llm, top_100_result_llm = task1_llm.execute()
+        st.session_state.top_100_books_llm_result = top_100_result_llm
+    st.success(st.session_state.top_100_books_llm_result)
+
+    if "top_100_books_web" not in st.session_state:
+        st.session_state.top_100_books_web, top_100_result_web = task1_web.execute()
+        st.session_state.top_100_books_web_result = top_100_result_web
+    st.success(st.session_state.top_100_books_web_result)
+
+    # Compare results from LLM and Web Scraping
+    st.write("Comparison of Top 100 Books (LLM vs Web Scraping):")
+    comparison_result = "Books in both lists:\n"
+    common_books = set(st.session_state.top_100_books_llm) & set(st.session_state.top_100_books_web)
+    for book in common_books:
+        comparison_result += f"- {book}\n"
+    st.write(comparison_result)
 
     # Add the second task with the output of the first task
-    task2 = Task("Find top 10 books from top 100", find_top_10_from_100, st.session_state.top_100_books)
+    task2 = Task("Find top 10 books from top 100", find_top_10_from_100, st.session_state.top_100_books_llm)
     agent.add_task(task2)
 
     # Execute the second task to get the top 10 books
@@ -91,15 +144,7 @@ def main():
         st.session_state.selected_book_result = selected_book_result
     st.success(st.session_state.selected_book_result)
 
-    # Add a final task to conclude the workflow with a thank-you message
-    task4 = Task("Close the task and conclude workflow with a thank-you message", lambda: "Thank you for using the book finder agent!")
-    agent.add_task(task4)
-
-    # Execute the final task
-    if "final_message" not in st.session_state:
-        final_result = task4.execute()
-        st.session_state.final_message = final_result
-    st.success(st.session_state.final_message)
+    st.success("Thank you for using the Workflow Agent!")
 
 if __name__ == "__main__":
     main()
